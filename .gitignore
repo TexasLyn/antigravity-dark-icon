@@ -1,0 +1,10 @@
+# macOS
+.DS_Store
+._*
+
+# Python
+__pycache__/
+*.py[cod]
+
+# 生成物（如需提交自定义变体，把模板收窄）
+/icons/*.icns.generated

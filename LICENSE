@@ -1,0 +1,38 @@
+MIT License
+
+Copyright (c) 2026 Antigravity Dark Icon contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---------------------------------------------------------------------------
+
+注意 / Note:
+
+本许可证仅覆盖本仓库中的**脚本与文档**（apply-icon.sh、scripts/、README 等）。
+
+`icons/` 与 `original-icon.icns` 中的图形素材是 Google Antigravity / Gemini
+应用图标的衍生作品，商标与原始图形版权归 Google LLC 所有，随本仓库分发
+仅用于「替换本机已安装应用的图标」这一个人用途，不构成本仓库作者对
+上述素材的任何授权或主张。
+
+The MIT license above covers the scripts and documentation only. The graphics in
+`icons/` and `original-icon.icns` are derivative works of the Google Antigravity /
+Gemini app icons; the trademarks and original artwork belong to Google LLC. They
+are distributed here solely for personal use (swapping the icon of a locally
+installed app) and no ownership is claimed.
