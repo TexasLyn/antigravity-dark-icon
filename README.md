@@ -10,9 +10,14 @@
 git clone https://github.com/TexasLyn/antigravity-dark-icon.git
 cd antigravity-dark-icon
 
-./apply-icon.sh          # 列出所有变体
-./apply-icon.sh G        # 应用「Gemini 同款」（推荐）
-./apply-icon.sh restore  # 还原官方原版
+# 方式一：系统级深浅双变体图标（macOS 26+，推荐）
+./apply-appicon.sh install    # 浅色白底 / 深色系统材质，跟随系统自动切换
+./apply-appicon.sh restore    # 还原官方原版
+
+# 方式二：固定深色单 icns（旧方案，任何 macOS 版本）
+./apply-icon.sh               # 列出所有变体
+./apply-icon.sh G             # 应用「Gemini 同款」
+./apply-icon.sh restore       # 还原官方原版
 ```
 
 往 `/Applications/*.app` 内部写文件属于 macOS **App Management 保护**范围（即使目录 owner 是你也会 `EPERM`），所以必须在**「终端」**里运行，脚本会自动 `exec sudo` 提权（**只需输一次密码**），然后：
@@ -129,9 +134,12 @@ VARIANTS = {
 
 ```
 antigravity-dark-icon/
-├── apply-icon.sh          # 应用 / 还原图标（自动 sudo + 重签 + 刷新 Dock）
-├── icons/                 # 5 个变体 icns
-├── scripts/make_icns.py   # 从官方图标重新生成变体（可自定义颜色）
+├── apply-appicon.sh       # v2：装入系统级深浅双变体图标（Assets.car + CFBundleIconName）
+├── Antigravity.icon/      # v2 源文件：icon.json + 分层 Assets（可编辑底色/光照）
+├── compiled/              # v2 编译产物：Assets.car + Antigravity.icns + partial.plist
+├── apply-icon.sh          # v1：应用 / 还原固定深色 icns（自动 sudo + 重签 + 刷 Dock）
+├── icons/                 # v1：5 个深色变体 icns
+├── scripts/make_icns.py   # v1 生成器：从官方图标重建变体（可自定义颜色）
 ├── original-icon.icns     # 官方原图备份（240,982 B）
 ├── preview-dock.png       # 贴进真实 Dock 截图的对比
 ├── before-dock-detail.png # 替换前后的 Dock 局部放大
@@ -156,26 +164,55 @@ killall Dock
 
 ---
 
-## 附：关于「系统按深浅模式自动切换图标」
+## v2：系统级深浅自动切换（推翻了 v1 的「不可行」结论）
 
-macOS 26+ 确实支持 app 图标的 light/dark/tinted 变体，但**机制有坑**，实测结论：
+v1 附录曾断言：自动切换唯一路径是 Icon Composer（纯 GUI、格式未公开），所以没做。**2026-09-29 重新验证后发现结论错了**，而且整个链路可以纯 CLI 完成：
+
+1. **`.icon` 不是封闭格式** —— 它就是一个普通目录：
+   ```
+   Antigravity.icon/
+   ├── icon.json     # 结构描述：分层、填充、光照、平台
+   └── Assets/       # 分层图（PNG/SVG 均可）
+       └── 1.glyph_unspecified_unspecified_automatic.png
+   ```
+   Xcode 模板里就有空白样例（`Xcode.app/.../File Templates/macOS/Resource/Icon Composer Icon.xctemplate/`）。
+
+2. **actool 直接吃 `.icon` 目录**，产出 `Assets.car` + 合成 `.icns`：
+   ```bash
+   actool --compile out/ --platform macosx --minimum-deployment-target 26.0 \
+     --app-icon Antigravity --output-partial-info-plist out/partial.plist Antigravity.icon
+   ```
+   产物结构与 Gemini 真机 `Assets.car` 同构（`Icon Image` 全 System + `Group` 分 Aqua/Dark/Tintable 三外观，运行时系统按外观实时合成）。
+
+3. **外观特化的正确入口是 icon.json，不是文件名**。文件名里 `1.bg_dark_...` 这种槽位**不生效**（实测编译后 dark 合成组照样引用普通层）；要换底色得用 `fill-specializations`：
+   ```json
+   {
+     "fill" : { "automatic-gradient" : "extended-srgb:1,1,1,1" },
+     "fill-specializations" : [
+       { "appearance" : "dark", "value" : "automatic" }
+     ]
+   }
+   ```
+   浅色 = 白底；深色 = `"automatic"` 让系统上深色玻璃材质（和系统其它图标同源）。编译后 `Assets.car` 里会多出一个 `Color-4` 条目 —— 这就是特化生效的标志。
+
+4. 本仓库的 `Antigravity.icon/` 是可编辑源（想改底色/光照直接改 `icon.json`），`compiled/` 是编译产物，`apply-appicon.sh` 负责装入：写 `CFBundleIconName` + `CFBundleIconFile` → `Assets.car` 进 Resources → ad-hoc 重签 → 刷 Dock。
+
+> 深浅切换依旧没有 per-layer 的实测样例可抄（只验证了 fill 层面），所以 A 字形本身在两种模式下是同一张彩虹图层 —— 它本来就该是彩色的，无需特化。
+
+## 附：v1 时代的实测记录（部分结论已被 v2 推翻，留档）
+
+macOS 26+ 确实支持 app 图标的 light/dark/tinted 变体，但**机制有坑**：
 
 1. **传统的 `.appiconset` + `appearances: [{appearance: luminosity, value: dark}]` 写法对 macOS app icon 无效**。
    实测用 `actool` 编译「含 dark 条目」和「仅 light」两个图标集，产出的 `Assets.car` **md5 完全一致**
    （`7f51da3d6400575cb1f4a37020bc37f7`），`assetutil --info` 显示 11 个 rendition 的 `Appearance` 全是 `None`
    —— actool 静默忽略了 dark 条目。
+   ✅ 此结论仍成立，但**只对老 `.appiconset` 路径成立**；v2 走的 `.icon` 目录 + `fill-specializations` 不受此限。
 
-2. **唯一可行路径是 Icon Composer 的 `.icon` 格式**。
-   参考 `/Applications/Gemini.app` 的 `Assets.car`，里面有 `AppIcon/Group`、`AppIcon_Assets/gemini`、
-   `AppIcon_Assets/Color-1` 这类**分层命名**，配合 `ISAppearanceTintable` / `NSAppearanceNameAqua` /
-   `NSAppearanceNameDarkAqua` 三种 Appearance —— 这是 Icon Composer 编译产物的特征。
+2. ~~「唯一可行路径是 Icon Composer 的 `.icon` 格式」「Icon Composer 是纯 GUI、无 CLI、`.icon` 格式未公开」~~
+   ❌ **已被 v2 推翻**：`.icon` 是开放的目录格式（`icon.json` + `Assets/`），actool 可直接编译，全程无需 GUI。
 
-3. **Icon Composer 在 `/Applications/Xcode.app/Contents/Applications/Icon Composer.app`**，
-   是纯 GUI 工具，**没有命令行接口**（`--help` 会直接启动窗口）。`.icon` 格式也未公开。
-
-4. 所以要做「自动切换」就得走 GUI 手工流程。**但收益有限**：深色底图标在浅色模式下完全正常
-   （VS Code、Xcode、Claude 全都是固定深色底），而白底图标在浅色模式下反而因对比不足而「隐形」。
-   本补丁的深色版在两种模式下都更好看。
+3. ~~「收益有限，不做」~~ ❌ 已实现（见 v2 章节）。
 
 ### 有用的排查命令
 
