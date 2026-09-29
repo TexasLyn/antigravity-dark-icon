@@ -135,8 +135,10 @@ VARIANTS = {
 ```
 antigravity-dark-icon/
 ├── apply-appicon.sh       # v2：装入系统级深浅双变体图标（Assets.car + CFBundleIconName）
-├── Antigravity.icon/      # v2 源文件：icon.json + 分层 Assets（可编辑底色/光照）
-├── compiled/              # v2 编译产物：Assets.car + Antigravity.icns + partial.plist
+├── Antigravity.icon/      # v2 源文件：icon.json + 分层 Assets（glyph 层已加 scale 1.25 补偿）
+├── compiled/              # v2 编译产物：Assets.car + 全档位 Antigravity.icns + partial.plist
+│   ├── def-1024.png       # ictool 渲染的浅色外观 1024px 留档
+│   └── dark-1024.png      # ictool 渲染的深色外观 1024px 留档
 ├── apply-icon.sh          # v1：应用 / 还原固定深色 icns（自动 sudo + 重签 + 刷 Dock）
 ├── icons/                 # v1：5 个深色变体 icns
 ├── scripts/make_icns.py   # v1 生成器：从官方图标重建变体（可自定义颜色）
@@ -198,6 +200,48 @@ v1 附录曾断言：自动切换唯一路径是 Icon Composer（纯 GUI、格�
 4. 本仓库的 `Antigravity.icon/` 是可编辑源（想改底色/光照直接改 `icon.json`），`compiled/` 是编译产物，`apply-appicon.sh` 负责装入：写 `CFBundleIconName` + `CFBundleIconFile` → `Assets.car` 进 Resources → ad-hoc 重签 → 刷 Dock。
 
 > 深浅切换依旧没有 per-layer 的实测样例可抄（只验证了 fill 层面），所以 A 字形本身在两种模式下是同一张彩虹图层 —— 它本来就该是彩色的，无需特化。
+
+## v2.1：比例修复 —— Liquid Glass 的 ~0.8 系统性内缩
+
+v2 装机后发现 A 字形明显偏小。用 `ictool`（Apple 官方 CLI，藏在
+`Icon Composer.app/Contents/Executables/ictool`）逐层量化后定位到根因：
+
+| 渲染路径 | A 宽占比（应 60.4%） |
+|---|---|
+| `ictool` 渲染 `.icon` 源 | 60.2% ✅ 图层本身没问题 |
+| actool 合成的 `Antigravity.icns` | 48.4% ❌ 被内缩到 ~0.8 倍 |
+| 真实 Dock 显示 | ~48%，和合成 icns 一致 |
+
+**结论：macOS 26 的 Liquid Glass 渲染对图标内容有 ~0.8 的系统性内缩**，Apple 官方图标是在图层里放大来补偿的。修复 = 图层加 `position.scale`：
+
+```json
+{
+  "image-name" : "1.glyph_unspecified_unspecified_automatic.png",
+  "name" : "1.glyph",
+  "position" : { "scale" : 1.25, "translation-in-points" : [ 0, 0 ] }
+}
+```
+
+`1.25` = 渲染 75.2% × 内缩 0.8 ≈ 60.2%，与原版对齐。
+
+**另外两个顺带修掉的问题**：
+
+1. **actool 合成的 icns 只有 4 个尺寸档**（16/32/128），Dock 大图标会糊。解法：用 `ictool` 渲染 1024px Default 外观 PNG，再按 10 档 LANCZOS 重采样 + `iconutil -c icns` 重建全档位 fallback。
+2. **改图标不用装机验证了**：`ictool` 可以直接渲染各外观预览——
+   ```bash
+   ICTOOL="/Applications/Xcode.app/Contents/Applications/Icon Composer.app/Contents/Executables/ictool"
+   $ICTOOL Antigravity.icon --export-image --output-file def.png \
+     --platform macOS --rendition Default --width 1024 --height 1024 --scale 1
+   $ICTOOL Antigravity.icon --export-image --output-file dark.png \
+     --platform macOS --rendition Dark --width 1024 --height 1024 --scale 1
+   ```
+   渲染 → 量化（A 的 bbox 占比）→ 确认后再编译装入，迭代闭环全部离线完成。产物留档在 `compiled/def-1024.png` / `compiled/dark-1024.png`。
+
+## 参考：踩同一条路的社区资源
+
+- [`peterpoliwoda/icon-composer-template`](https://github.com/peterpoliwoda/icon-composer-template) —— icon.json 字段的完整逆向参考（Apple 不公开 schema）。确认 fill 支持 `linear-gradient` / `system-dark` 等写法，想把深色底从 `"automatic"` 换成精确 `#212121 → #0F0F0F` 渐变可参考。
+- Emacs Plus（Homebrew）—— 同类先例：给第三方 app 配 macOS 26 图标，流程一致（Assets.car + 保留 icns + 重签），另有带深浅预览的社区图标库。
+- [successfulsoftware.net 的相关文章](https://successfulsoftware.net/) —— 独立印证手动装配流程；提到 actool 26.5+ 曾有 `.icon` 编译回归，建议**预编译后提交 Assets.car**（本仓库正是这么做的：`compiled/` 已含产物，装包不依赖本机 actool）。
 
 ## 附：v1 时代的实测记录（部分结论已被 v2 推翻，留档）
 
