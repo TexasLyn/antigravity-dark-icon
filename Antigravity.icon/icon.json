@@ -14,7 +14,11 @@
       "layers" : [
         {
           "image-name" : "1.glyph_unspecified_unspecified_automatic.png",
-          "name" : "1.glyph"
+          "name" : "1.glyph",
+          "position" : {
+            "scale" : 1.25,
+            "translation-in-points" : [ 0, 0 ]
+          }
         }
       ],
       "lighting" : "individual",
